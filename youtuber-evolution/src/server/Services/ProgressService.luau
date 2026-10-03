@@ -47,6 +47,9 @@ function ProgressService.Check(player: Player, quiet: boolean?)
 	local tier = Stats.EvolutionTier(video)
 	local oldTier = lastTier[player] or tier
 	lastTier[player] = tier
+	if player:GetAttribute("Evo") ~= tier then
+		player:SetAttribute("Evo", tier)
+	end
 	if tier ~= oldTier then
 		if tier > data.BestEvolution then
 			data.BestEvolution = tier
@@ -108,6 +111,7 @@ function ProgressService.Start()
 		local video = Stats.VideoLevel(data.Views)
 		lastVideo[player] = video
 		lastTier[player] = Stats.EvolutionTier(video)
+		player:SetAttribute("Evo", lastTier[player])
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		lastVideo[player] = nil

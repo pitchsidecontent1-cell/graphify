@@ -112,12 +112,25 @@ def render(parts, cam, look, fov, out):
     f = (H / 2) / math.tan(math.radians(fov) / 2)
     sun = norm([0.35, 0.85, -0.4])
 
-    def project(v):
+    NEAR = 0.5
+
+    def to_view(v):
         d = sub(v, cam)
-        z = dot(d, fwd)
-        if z < 0.5:
-            return None, z
-        return (W / 2 + dot(d, right) / z * f, H / 2 - dot(d, up) / z * f), z
+        return (dot(d, right), dot(d, up), dot(d, fwd))
+
+    def clip(poly):
+        # Sutherland-Hodgman against the near plane z >= NEAR
+        out = []
+        n = len(poly)
+        for i in range(n):
+            a, b = poly[i], poly[(i + 1) % n]
+            ina, inb = a[2] >= NEAR, b[2] >= NEAR
+            if ina:
+                out.append(a)
+            if ina != inb:
+                t = (NEAR - a[2]) / (b[2] - a[2])
+                out.append(tuple(a[k] + (b[k] - a[k]) * t for k in range(3)))
+        return out
 
     polys = []
     for prt in parts:
@@ -132,17 +145,11 @@ def render(parts, cam, look, fov, out):
             center = [sum(v[i] for v in verts) / len(verts) for i in range(3)]
             if dot(nrm, sub(cam, center)) <= 0:
                 continue
-            pts, zs = [], []
-            ok = True
-            for v in verts:
-                q, z = project(v)
-                if q is None:
-                    ok = False
-                    break
-                pts.append(q)
-                zs.append(z)
-            if not ok:
+            view = clip([to_view(v) for v in verts])
+            if len(view) < 3:
                 continue
+            pts = [(W / 2 + x / z * f, H / 2 - y / z * f) for x, y, z in view]
+            zs = [z for _, _, z in view]
             depth = sum(zs) / len(zs)
             light = 1.0 if neon else 0.55 + 0.45 * max(0, dot(norm(nrm), sun))
             haze = min(0.5, depth / 3000)

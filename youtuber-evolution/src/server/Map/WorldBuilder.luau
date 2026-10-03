@@ -109,6 +109,11 @@ local function buildIsland(world: World, root: Instance)
 		local mx = math.sin(mid) * Layout.PlazaRadius
 		local mz = math.cos(mid) * Layout.PlazaRadius
 		local onRoad = math.abs(mx) < Layout.Road.HalfWidth + 6 and mz > 0
+		for _, info in Layout.Stations do
+			if math.abs(mx - info.Position.X) < 19 and math.abs(mz - info.Position.Z) < 19 then
+				onRoad = true -- leave the stage edge clear
+			end
+		end
 		if not onRoad then
 			local p0 = O + Vector3.new(math.sin(a0) * Layout.PlazaRadius, 0, math.cos(a0) * Layout.PlazaRadius)
 			local p1 = O + Vector3.new(math.sin(a1) * Layout.PlazaRadius, 0, math.cos(a1) * Layout.PlazaRadius)
@@ -265,9 +270,10 @@ local function buildPlaza(world: World, root: Instance)
 		local target = info.Position * 0.72
 		filmPath(folder, O + target * 0.25, O + target, 10, pal)
 	end
+	-- short path from behind the monument to the worlds portal
 	filmPath(
 		folder,
-		O + Vector3.new(0, 0, Layout.Spawn.Z - 16),
+		O + Vector3.new(0, 0, Layout.Monument.Z - 9),
 		O + Vector3.new(0, 0, Layout.WorldsPortal.Z + 18),
 		10,
 		pal

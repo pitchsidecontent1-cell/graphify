@@ -315,6 +315,7 @@ function UIKit.Button(p: ButtonProps): Button
 	shadow.BorderSizePixel = 0
 	shadow.Position = UDim2.fromOffset(0, 6)
 	shadow.Size = UDim2.fromScale(1, 1)
+	shadow.ZIndex = 0
 	UIKit.Corner(shadow, radius)
 	shadow.Parent = root
 
@@ -495,6 +496,7 @@ function UIKit.IconButton(p: {
 	shadow.BackgroundColor3 = INK
 	shadow.Position = UDim2.fromOffset(0, 6)
 	shadow.Size = UDim2.fromScale(1, 1)
+	shadow.ZIndex = 0
 	UIKit.Corner(shadow, 22)
 	shadow.Parent = root
 
@@ -724,15 +726,15 @@ function UIKit.Panel(p: { Title: string, Color: Color3, Size: Vector2?, Parent: 
 	root.Visible = false
 	root.ZIndex = 50
 
+	-- `window` is a transparent container (it carries the pop-in UIScale);
+	-- the visible panel is `surface`, with the drop shadow behind it.
+	-- (ZIndexBehavior is Sibling, so a child can never draw under its parent.)
 	local window = Instance.new("Frame")
 	window.Name = "Window"
 	window.AnchorPoint = Vector2.new(0.5, 0.5)
 	window.Position = UDim2.fromScale(0.5, 0.52)
 	window.Size = UDim2.fromOffset(size.X, size.Y)
-	window.BackgroundColor3 = C.Panel
-	UIKit.Corner(window, 28)
-	UIKit.Stroke(window, 5, INK)
-	UIKit.Gradient(window, ColorSequence.new(C.PanelLight, C.PanelDark), 90)
+	window.BackgroundTransparency = 1
 	window.Parent = root
 
 	local shadow = Instance.new("Frame")
@@ -745,17 +747,28 @@ function UIKit.Panel(p: { Title: string, Color: Color3, Size: Vector2?, Parent: 
 	UIKit.Corner(shadow, 28)
 	shadow.Parent = window
 
+	local surface = Instance.new("Frame")
+	surface.Name = "Surface"
+	surface.BackgroundColor3 = C.Panel
+	surface.Size = UDim2.fromScale(1, 1)
+	surface.ZIndex = 1
+	UIKit.Corner(surface, 28)
+	UIKit.Stroke(surface, 5, INK)
+	UIKit.Gradient(surface, ColorSequence.new(C.PanelLight, C.PanelDark), 90)
+	surface.Parent = window
+
 	local innerBand = Instance.new("Frame")
 	innerBand.BackgroundTransparency = 1
 	innerBand.Position = UDim2.fromOffset(6, 6)
 	innerBand.Size = UDim2.new(1, -12, 1, -12)
 	UIKit.Corner(innerBand, 24)
 	UIKit.Stroke(innerBand, 2.5, WHITE, 0.8)
-	innerBand.Parent = window
+	innerBand.Parent = surface
 
 	-- film strip band
 	local strip = Instance.new("Frame")
 	strip.Name = "FilmStrip"
+	strip.ZIndex = 2
 	strip.BackgroundColor3 = INK
 	strip.Position = UDim2.fromOffset(18, 16)
 	strip.Size = UDim2.new(1, -36, 0, 22)
@@ -850,6 +863,7 @@ function UIKit.Panel(p: { Title: string, Color: Color3, Size: Vector2?, Parent: 
 
 	local body = Instance.new("Frame")
 	body.Name = "Body"
+	body.ZIndex = 3
 	body.BackgroundTransparency = 1
 	body.Position = UDim2.fromOffset(28, 54)
 	body.Size = UDim2.new(1, -56, 1, -78)

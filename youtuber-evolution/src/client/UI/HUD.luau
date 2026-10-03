@@ -158,7 +158,7 @@ local function buildTopCenter(root: Frame)
 		Name = "NicheButton",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 14),
-		Size = UDim2.fromOffset(360, 74),
+		Size = UDim2.fromOffset(440, 74),
 		Parent = root,
 	})
 	local b = UIKit.Button({
@@ -166,7 +166,7 @@ local function buildTopCenter(root: Frame)
 		Icon = "Niche",
 		Color = C.Pink,
 		Size = UDim2.fromScale(1, 1),
-		TextSize = 28,
+		TextSize = 26,
 		Parent = holder,
 		OnClick = function()
 			UI.Toggle("Niche")
@@ -591,6 +591,45 @@ local function refreshBoosts()
 	set("Treadmill", tm ~= nil, if tm then ("🏃 TREADMILL x" .. tm.Mult) else "", C.Purple, 5)
 end
 
+-- Phones: keep the bottom-left (thumbstick) and bottom-right (jump) corners
+-- clear by moving the menu buttons into a top row and currencies under it.
+function HUD.ApplyLayout()
+	if not UI.IsTouch then
+		return
+	end
+	local root = HUD.Root
+	local left = root:FindFirstChild("LeftButtons") :: Frame?
+	if left then
+		local grid = left:FindFirstChildOfClass("UIGridLayout")
+		if grid then
+			grid.CellSize = UDim2.fromOffset(100, 100)
+			grid.CellPadding = UDim2.fromOffset(12, 12)
+			grid.FillDirection = Enum.FillDirection.Horizontal
+		end
+		left.AnchorPoint = Vector2.zero
+		left.Position = UDim2.fromOffset(18, 10)
+		left.Size = UDim2.fromOffset(6 * 100 + 5 * 12, 100)
+		for _, b in left:GetChildren() do
+			if b:IsA("Frame") then
+				b.Size = UDim2.fromOffset(100, 100)
+			end
+		end
+	end
+	local currencies = root:FindFirstChild("Currencies") :: Frame?
+	if currencies then
+		currencies.AnchorPoint = Vector2.zero
+		currencies.Position = UDim2.fromOffset(18, 128)
+		local list = currencies:FindFirstChildOfClass("UIListLayout")
+		if list then
+			list.VerticalAlignment = Enum.VerticalAlignment.Top
+		end
+	end
+	local boosts = root:FindFirstChild("Boosts") :: Frame?
+	if boosts then
+		boosts.Position = UDim2.new(1, -22, 1, -230)
+	end
+end
+
 function HUD.SetHidden(isHidden: boolean)
 	hidden = isHidden
 	for _, child in HUD.Root:GetChildren() do
@@ -612,6 +651,7 @@ function HUD.Start()
 	buildBottomLeft(root)
 	buildBottomCenter(root)
 	buildBottomRight(root)
+	HUD.ApplyLayout()
 
 	for _, key in { "Devices", "Upgrades", "Daily", "Rebirths", "Unlocked" } do
 		State.On(key, function()

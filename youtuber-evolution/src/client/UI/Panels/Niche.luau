@@ -233,7 +233,7 @@ return function(): UI.PanelHandle
 		Text = "GET TICKETS",
 		Icon = "🎟️",
 		Color = C.Ticket,
-		Size = UDim2.fromOffset(300, 84),
+		Size = UDim2.fromOffset(280, 84),
 		TextSize = 30,
 		Parent = buttons,
 		OnClick = function()
