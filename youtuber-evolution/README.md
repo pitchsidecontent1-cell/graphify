@@ -12,6 +12,13 @@ A complete Roblox "+1 per step" simulator. Every step you take gives you **+1 Vi
 
 Everything is already built: 4 themed worlds, 60 gates, 84 devices, 40 pets, 20 evolutions, niche rolls, treadmills, rewards, a Robux shop, leaderboards, an admin panel and a sticker-style UI. No meshes or images are needed.
 
+Map previews (rough renders of the baked map, without textures or text) are in [`docs/previews`](docs/previews):
+
+| | |
+|---|---|
+| ![hub](docs/previews/1-sunny-park-hub.png) | ![road](docs/previews/2-gate-road.png) |
+| ![arena](docs/previews/6-rival-arena.png) | ![pets](docs/previews/9-pets.png) |
+
 ---
 
 ## 1. Open it in Roblox Studio (2 minutes)

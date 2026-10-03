@@ -30,7 +30,7 @@ local NEAR = Color3.fromRGB(255, 200, 60)
 local OPEN = Color3.fromRGB(80, 230, 120)
 
 -- Gates --------------------------------------------------------------------------------------
-local gateOpen: { [Instance]: boolean } = {}
+local gateState: { [Instance]: string } = {} -- "open" | "near" | "locked"
 
 local function refreshGate(barrier: BasePart)
 	if not State.IsLoaded then
@@ -41,39 +41,45 @@ local function refreshGate(barrier: BasePart)
 		return
 	end
 	local video = Stats.VideoLevel(State.Data.Views)
-	local open = video >= req
-	local wasOpen = gateOpen[barrier]
-	gateOpen[barrier] = open
+	local state = if video >= req then "open" elseif video >= req - 2 then "near" else "locked"
+	local previous = gateState[barrier]
+	if previous == state then
+		return -- nothing changed; don't fight running animations
+	end
+	gateState[barrier] = state
 	local gui = barrier:FindFirstChild("Req")
 	local label = gui and gui:FindFirstChild("Text") :: TextLabel?
-	if open then
+	if state == "open" then
 		barrier.CanCollide = false
-		barrier.Transparency = 0.92
 		barrier.Color = OPEN
 		if label then
 			label.Text = "✅ OPEN"
 			label.TextColor3 = OPEN
 		end
-		if wasOpen == false then
-			-- just unlocked: flash + sound
+		if previous ~= nil then
+			-- just unlocked while playing: flash + rising chime
 			barrier.Transparency = 0.2
 			barrier.Material = Enum.Material.Neon
-			task.delay(0.25, function()
-				barrier.Material = Enum.Material.ForceField
-				barrier.Transparency = 0.92
+			task.delay(0.3, function()
+				if gateState[barrier] == "open" then
+					barrier.Material = Enum.Material.ForceField
+					barrier.Transparency = 0.92
+				end
 			end)
 			local idx = barrier:GetAttribute("Gate")
 			Sound.Play("Gate", 1 + (if typeof(idx) == "number" then idx else 0) * 0.04)
+		else
+			barrier.Material = Enum.Material.ForceField
+			barrier.Transparency = 0.92
 		end
 	else
 		barrier.CanCollide = true
 		barrier.Transparency = 0
 		barrier.Material = Enum.Material.ForceField
-		local near = video >= req - 2
-		barrier.Color = if near then NEAR else LOCKED
+		barrier.Color = if state == "near" then NEAR else LOCKED
 		if label then
 			label.Text = "🔒 VIDEO " .. req
-			label.TextColor3 = if near then NEAR else C.White
+			label.TextColor3 = if state == "near" then NEAR else C.White
 		end
 	end
 end
@@ -261,9 +267,15 @@ end
 function WorldFX.Init() end
 
 function WorldFX.Start()
-	State.On("Views", function()
-		refreshAllGates()
-		refreshPadLabels()
+	local lastVideo = -1
+	State.On("Views", function(views)
+		-- gates + pad locks only change when the Video level does
+		local video = Stats.VideoLevel(views)
+		if video ~= lastVideo then
+			lastVideo = video
+			refreshAllGates()
+			refreshPadLabels()
+		end
 	end)
 	for _, key in { "Rebirths", "Context", "Upgrades", "Potions" } do
 		State.On(key, function()

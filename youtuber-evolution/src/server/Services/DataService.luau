@@ -123,6 +123,8 @@ local function loadProfile(player: Player): Data?
 		local loaded: { [string]: any }? = nil
 		local ok, err = pcall(function()
 			(store :: DataStore):UpdateAsync(key, function(old: any)
+				-- UpdateAsync may re-run this transform, so reset per call
+				lockedElsewhere = false
 				local now = os.time()
 				if typeof(old) == "table" and old.Lock and old.Lock.Job ~= game.JobId then
 					local age = now - (old.Lock.Time or 0)
@@ -175,6 +177,7 @@ local function saveProfile(player: Player, release: boolean): boolean
 		local stolen = false
 		local ok, err = pcall(function()
 			(store :: DataStore):UpdateAsync(key, function(old: any)
+				stolen = false
 				if typeof(old) == "table" and old.Lock and old.Lock.Job ~= game.JobId then
 					stolen = true
 					return nil

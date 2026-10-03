@@ -817,6 +817,90 @@ local function buildArena(world: World, root: Instance)
 	spot:AddTag("RivalSpot")
 	spot:SetAttribute("World", world.Id)
 
+	-- boss-stage dressing: neon floor ring, crowd bleachers, light towers
+	MapKit.Ring(
+		folder,
+		CFrame.new(O + Vector3.new(0, 0.35, A.RivalZ)) * CFrame.Angles(math.rad(90), 0, 0),
+		13,
+		0.6,
+		28,
+		pal.Accent2
+	)
+	local crowdRng = Rng.new(world.Id * 31 + 5)
+	local crowdColors = { pal.Accent1, pal.Accent2, pal.Accent3, WHITE, pal.Wall3 }
+	local benchStart = A.StartZ + 18
+	local benchLen = A.MonitorZ - 14 - benchStart
+	for _, side in { -1, 1 } do
+		for step = 0, 2 do
+			local x = side * (A.HalfWidth - 6 - step * 7)
+			local h = 2 + step * 2.2
+			PropKit.Part({
+				Name = "Bleacher",
+				Size = Vector3.new(8, h, benchLen),
+				CFrame = CFrame.new(O + Vector3.new(x, h / 2, benchStart + benchLen / 2)),
+				Color = if step % 2 == 0 then pal.Wall2 else pal.Wall1,
+				Parent = folder,
+			})
+		end
+		for i = 1, 26 do
+			local step = crowdRng:Int(0, 2)
+			local x = side * (A.HalfWidth - 6 - step * 7) + crowdRng:Range(-2.5, 2.5)
+			local z = benchStart + crowdRng:Range(3, benchLen - 3)
+			local y = 2 + step * 2.2
+			local color = crowdRng:Pick(crowdColors)
+			PropKit.Deco({
+				Name = "Fan",
+				Size = Vector3.new(1.8, 2.4, 1.4),
+				CFrame = CFrame.new(O + Vector3.new(x, y + 1.2, z)),
+				Color = color,
+				Parent = folder,
+			})
+			PropKit.Deco({
+				Name = "FanHead",
+				Size = Vector3.new(1.4, 1.4, 1.4),
+				CFrame = CFrame.new(O + Vector3.new(x, y + 3.1, z)),
+				Color = Color3.fromRGB(255, 214, 170),
+				Parent = folder,
+			})
+			if i % 4 == 0 then
+				-- a fan holding up a glowing phone
+				PropKit.Deco({
+					Name = "FanPhone",
+					Size = Vector3.new(0.6, 1, 0.15),
+					CFrame = CFrame.new(O + Vector3.new(x - side * 0.6, y + 4.4, z)),
+					Color = pal.Glow,
+					Material = Enum.Material.Neon,
+					Parent = folder,
+				})
+			end
+		end
+		for _, z in { A.StartZ + 14, A.MonitorZ - 10 } do
+			local base = CFrame.new(O + Vector3.new(side * (A.HalfWidth - 4), 0, z))
+			PropKit.Part({
+				Name = "LightTower",
+				Size = Vector3.new(2, 34, 2),
+				CFrame = base * CFrame.new(0, 17, 0),
+				Color = INK,
+				Parent = folder,
+			})
+			local head = PropKit.Deco({
+				Name = "LightHead",
+				Size = Vector3.new(5, 3, 3),
+				CFrame = base * CFrame.new(-side * 1.5, 34, 0),
+				Color = pal.Glow,
+				Material = Enum.Material.Neon,
+				Parent = folder,
+			})
+			local sl = Instance.new("SpotLight")
+			sl.Color = pal.Glow
+			sl.Brightness = 3
+			sl.Range = 60
+			sl.Angle = 45
+			sl.Face = Enum.NormalId.Bottom
+			sl.Parent = head
+		end
+	end
+
 	local challenge = pad(folder, CFrame.new(O + Vector3.new(0, 0, A.ChallengeZ)), Theme.Colors.Red, 12)
 	challenge:AddTag("StationPad")
 	setAttrs(challenge, { Station = "Rival", World = world.Id })
