@@ -87,14 +87,20 @@ for _, name in ORDER do
 end
 HUD.Init()
 for _, name in ORDER do
-	controllers[name].Init()
+	local ok, err = pcall(controllers[name].Init)
+	if not ok then
+		warn("[Client] " .. name .. ".Init failed: " .. tostring(err))
+	end
 end
 
 pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 end)
 
-HUD.Start()
+local hudOk, hudErr = pcall(HUD.Start :: any)
+if not hudOk then
+	warn("[Client] HUD failed: " .. tostring(hudErr))
+end
 State.Start()
 Sound.Start()
 Request.Start()

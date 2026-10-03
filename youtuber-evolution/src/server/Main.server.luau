@@ -30,10 +30,14 @@ for _, name in ORDER do
 	loaded[name] = (require :: any)(module)
 end
 
+-- One broken service should never take the whole server down.
 for _, name in ORDER do
 	local service = loaded[name]
 	if service.Init then
-		service.Init()
+		local ok, err = pcall(service.Init)
+		if not ok then
+			warn("[Server] " .. name .. ".Init failed: " .. tostring(err))
+		end
 	end
 end
 
