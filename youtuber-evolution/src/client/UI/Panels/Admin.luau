@@ -14,7 +14,6 @@ local Upgrades = require(Shared.Config.Upgrades)
 local Devices = require(Shared.Config.Devices)
 local Evolutions = require(Shared.Config.Evolutions)
 local Rewards = require(Shared.Config.Rewards)
-local Stats = require(Shared.Util.Stats)
 local AdminCommands = require(Shared.Util.AdminCommands)
 local UIKit = require(script.Parent.Parent.UIKit)
 local UI = require(script.Parent.Parent.UI)
@@ -40,10 +39,6 @@ local TABS = {
 	{ Id = "Server", Icon = "🖥️", Color = C.Cyan },
 	{ Id = "Commands", Icon = "📜", Color = C.Gold },
 }
-
-local function currentWorld(): number
-	return if State.IsLoaded then State.Data.World else 1
-end
 
 return function(): UI.PanelHandle
 	local panel = UIKit.Panel({ Title = "Admin", Color = C.Red, Size = PANEL })
@@ -98,7 +93,8 @@ return function(): UI.PanelHandle
 		for _, p in Players:GetPlayers() do
 			if p ~= Players.LocalPlayer then
 				others += 1
-				table.insert(targets, { label = string.upper(p.DisplayName), token = p.Name })
+				-- "@" = exact username, so look-alike display names can't hijack it
+				table.insert(targets, { label = string.upper(p.DisplayName), token = "@" .. p.Name })
 			end
 		end
 		if others > 1 then
@@ -368,13 +364,9 @@ return function(): UI.PanelHandle
 		cmdButton(g, "+1 VIDEO", C.Blue, "addvideo 1")
 		cmdButton(g, "+10 VIDEOS", C.Blue, "addvideo 10")
 		cmdButton(g, "-1 VIDEO", C.Grey, "addvideo -1")
-		cmdButton(g, "REBIRTH READY", C.Purple, function()
-			return "video " .. Stats.RebirthVideo(if State.IsLoaded then State.Data.Rebirths else 0)
-		end)
-		cmdButton(g, "OPEN ALL GATES", C.Mint, function()
-			local w = Worlds[currentWorld()]
-			return "video " .. w.Gates[#w.Gates]
-		end)
+		-- these keywords are worked out on the server for each target
+		cmdButton(g, "REBIRTH READY", C.Purple, "video rebirth")
+		cmdButton(g, "OPEN ALL GATES", C.Mint, "video gates")
 		cmdButton(g, "BACK TO VIDEO 1", C.Grey, "video 1")
 		inputRow(b, "SET VIDEO", "20", "1-400", "SET", C.Green, function(v)
 			return "video " .. v
@@ -382,14 +374,8 @@ return function(): UI.PanelHandle
 
 		b = section("Progress", "Evolution", "Each evolution tier changes your size, gear and title.")
 		g = grid(b)
-		cmdButton(g, "◀ PREVIOUS EVO", C.Grey, function()
-			local tier = Players.LocalPlayer:GetAttribute("Evo")
-			return "evo " .. math.max(1, (if typeof(tier) == "number" then tier else 1) - 1)
-		end)
-		cmdButton(g, "NEXT EVO ▶", C.Pink, function()
-			local tier = Players.LocalPlayer:GetAttribute("Evo")
-			return "evo " .. math.min(#Evolutions, (if typeof(tier) == "number" then tier else 1) + 1)
-		end)
+		cmdButton(g, "◀ PREVIOUS EVO", C.Grey, "evo prev")
+		cmdButton(g, "NEXT EVO ▶", C.Pink, "evo next")
 		cmdButton(g, "FINAL EVO", C.Gold, "evo " .. #Evolutions)
 		inputRow(b, "SET EVOLUTION", "5", "1-" .. #Evolutions, "SET", C.Green, function(v)
 			return "evo " .. v
@@ -417,7 +403,7 @@ return function(): UI.PanelHandle
 		end
 		cmdButton(g, "99 TICKETS", C.Cyan, "tickets 99")
 		cmdButton(g, "0 TICKETS", C.Grey, "tickets 0")
-		inputRow(b, "SET REBIRTHS", "3", "0-100", "SET", C.Green, function(v)
+		inputRow(b, "SET REBIRTHS", "3", "0-77", "SET", C.Green, function(v)
 			return "rebirths " .. v
 		end)
 
@@ -441,7 +427,8 @@ return function(): UI.PanelHandle
 				run("reset confirm")
 			else
 				armed = os.clock()
-				resetButton:SetText("CLICK AGAIN!")
+				-- say whose save gets wiped (the TARGET picker applies here too)
+				resetButton:SetText("WIPE " .. targets[targetIndex].label .. "?")
 				task.delay(3, function()
 					if os.clock() - armed >= 3 then
 						resetButton:SetText("🗑️ RESET DATA")
@@ -573,8 +560,11 @@ return function(): UI.PanelHandle
 		cmdButton(g, "ALL PETS", C.Mint, "allpets")
 		cmdButton(g, "👑 SECRET PET", C.Pink, "secretpet")
 		cmdButton(g, "CLEAR PETS", C.Grey, "clearpets")
-		inputRow(b, "GIVE PET", "dragon 3", "name or id, then amount", "GIVE", C.Green, function(v)
-			return "pet " .. v
+		inputRow(b, "GIVE PET", "galaxy dragon 3", "pet name, then amount", "GIVE", C.Green, function(v)
+			-- pet names have spaces; the command wants one word ("galaxydragon")
+			local name, count = string.match(v, "^(.-)%s+(%d+)$")
+			local squashed = string.gsub(name or v, "%s+", "")
+			return "pet " .. squashed .. (if count then " " .. count else "")
 		end)
 
 		b = section("Pets", "Free hatch x10", "Real odds, no clout and no walking needed.")

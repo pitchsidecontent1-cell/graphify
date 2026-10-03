@@ -173,6 +173,7 @@ local STEPS: { Step } = {
 }
 local step = 0
 local lastStepAt = 0
+local MIN_STEP_SECONDS = 3
 
 local function showHint(text: string?)
 	local h = hint
@@ -205,7 +206,9 @@ local function tutorialTick()
 		return
 	end
 	showHint(s.text)
-	if s.done() then
+	-- every hint stays up a few seconds, so a replayed tutorial (admin
+	-- "tutorial") doesn't flash past steps that are already done
+	if s.done() and os.clock() - lastStepAt >= MIN_STEP_SECONDS then
 		step += 1
 		lastStepAt = os.clock()
 		if STEPS[step] then

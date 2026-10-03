@@ -71,6 +71,18 @@ local function optionsFor(command: AdminCommands.Command, index: number): { stri
 	local name = command.Name
 	if arg.Kind == "player" then
 		return playerWords()
+	elseif name == "video" then
+		return { "rebirth", "gates" }
+	elseif name == "evo" then
+		return { "next", "prev" }
+	elseif name == "pet" and index == 1 then
+		local list = {}
+		for _, eggId in Pets.EggOrder do
+			for _, petId in Pets.Eggs[eggId].Pets do
+				table.insert(list, (string.gsub(string.lower(Pets.ById[petId].Name), "[^%w]", "")))
+			end
+		end
+		return list
 	elseif name == "goto" then
 		local list = { "spawn", "arena", "treadmills", "devices", "upgrades", "rebirth", "niche", "eggs", "portal" }
 		for _, p in Players:GetPlayers() do

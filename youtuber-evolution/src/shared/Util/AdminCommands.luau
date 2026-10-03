@@ -10,7 +10,9 @@
 local AdminCommands = {}
 
 export type ArgKind = "number" | "int" | "word" | "text" | "player"
-export type Arg = { Name: string, Kind: ArgKind, Optional: boolean? }
+-- Accept: for an optional word right before [player], says whether a token is
+-- this argument (otherwise it's read as the player): "upgrade all bob".
+export type Arg = { Name: string, Kind: ArgKind, Optional: boolean?, Accept: ((token: string) -> boolean)? }
 export type Command = {
 	Name: string,
 	Aliases: { string },
@@ -22,8 +24,21 @@ export type Command = {
 
 AdminCommands.Categories = { "Progress", "World", "Items", "Pets", "Rewards", "Rivals", "Robux", "Server" }
 
-local function a(name: string, kind: ArgKind, optional: boolean?): Arg
-	return { Name = name, Kind = kind, Optional = optional }
+local function a(name: string, kind: ArgKind, optional: boolean?, accept: ((string) -> boolean)?): Arg
+	return { Name = name, Kind = kind, Optional = optional, Accept = accept }
+end
+
+-- forward declared; defined below (ParseNumber)
+local isNumber: (string) -> boolean
+
+local function oneOf(...: string): (string) -> boolean
+	local set: { [string]: boolean } = {}
+	for _, v in { ... } do
+		set[v] = true
+	end
+	return function(token: string): boolean
+		return set[string.lower(token)] == true or isNumber(token)
+	end
 end
 
 local function cmd(
@@ -39,20 +54,41 @@ end
 
 AdminCommands.List = {
 	-- Progress -------------------------------------------------------------------------------
-	cmd("Progress", "video", { "setvideo", "vid" }, { a("level", "int") }, true, "Set your Video level (1-400)"),
+	cmd(
+		"Progress",
+		"video",
+		{ "setvideo", "vid" },
+		{ a("level|rebirth|gates", "word") },
+		true,
+		"Set the Video level (1-400). rebirth / gates = just enough to rebirth / open every gate here"
+	),
 	cmd("Progress", "addvideo", { "av" }, { a("amount", "int") }, true, "Add (or remove, with -) Video levels"),
 	cmd("Progress", "views", { "addviews" }, { a("amount", "number") }, true, "Add views (1k, 2.5m, 1e9...)"),
-	cmd("Progress", "evo", { "evolve", "tier" }, { a("tier", "int") }, true, "Jump to an Evolution tier (1-20)"),
+	cmd(
+		"Progress",
+		"evo",
+		{ "evolve", "tier" },
+		{ a("tier|next|prev", "word") },
+		true,
+		"Jump to an Evolution tier (1-20), or the next / previous one"
+	),
 	cmd("Progress", "clout", { "setclout" }, { a("amount", "number") }, true, "Set your clout"),
 	cmd("Progress", "addclout", { "ac" }, { a("amount", "number") }, true, "Add clout"),
 	cmd("Progress", "tickets", { "tix" }, { a("amount", "int") }, true, "Set your Niche Tickets"),
-	cmd("Progress", "rebirths", { "setrebirths" }, { a("count", "int") }, true, "Set your rebirth count (keeps views)"),
+	cmd(
+		"Progress",
+		"rebirths",
+		{ "setrebirths" },
+		{ a("count", "int") },
+		true,
+		"Set the rebirth count, 0-77 (keeps views)"
+	),
 	cmd("Progress", "rebirth", { "rb" }, {}, true, "Rebirth right now (no Video needed)"),
 	cmd(
 		"Progress",
 		"upgrade",
 		{ "upg" },
-		{ a("speed|clout|treadmill|all", "word"), a("level|max", "word", true) },
+		{ a("speed|clout|treadmill|all", "word"), a("level|max", "word", true, oneOf("max")) },
 		true,
 		"Set an upgrade level (default max)"
 	),
@@ -105,7 +141,14 @@ AdminCommands.List = {
 	cmd("Items", "group", {}, {}, true, "Toggle the group boost"),
 
 	-- Pets ------------------------------------------------------------------------------------
-	cmd("Pets", "pet", { "givepet" }, { a("name|id", "word"), a("count", "int", true) }, true, "Give a pet"),
+	cmd(
+		"Pets",
+		"pet",
+		{ "givepet" },
+		{ a("name|id", "word"), a("count", "int", true) },
+		true,
+		"Give a pet (names without spaces: galaxydragon)"
+	),
 	cmd("Pets", "allpets", {}, {}, true, "One of every pet (equips the best)"),
 	cmd("Pets", "secretpet", { "algopet" }, {}, true, "Give The Algo Pet (Secret)"),
 	cmd("Pets", "clearpets", {}, {}, true, "Delete every pet"),
@@ -126,7 +169,7 @@ AdminCommands.List = {
 		"Rivals",
 		"beat",
 		{},
-		{ a("world|all|here", "word", true) },
+		{ a("world|all|here", "word", true, oneOf("all", "here", "this")) },
 		true,
 		"Mark a rival beaten + unlock the next world (default: this world)"
 	),
@@ -229,6 +272,10 @@ function AdminCommands.ParseNumber(token: string): number?
 	return math.clamp(n, -AdminCommands.MaxNumber, AdminCommands.MaxNumber)
 end
 
+isNumber = function(token: string): boolean
+	return AdminCommands.ParseNumber(token) ~= nil
+end
+
 export type Parsed = {
 	Command: Command,
 	Args: { any }, -- by position; optional args left out are nil
@@ -275,6 +322,9 @@ function AdminCommands.Parse(raw: string): (Parsed?, string?)
 				args[index] = if spec.Kind == "int" then math.floor(n + 0.5) else n
 				i += 1
 			end
+		elseif spec.Optional and command.Target and i == #tokens and spec.Accept and not spec.Accept(token) then
+			-- "upgrade all bob": the last word is the [player], not this argument
+			continue
 		else -- word / player
 			args[index] = string.lower(token)
 			i += 1

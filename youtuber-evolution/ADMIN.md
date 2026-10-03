@@ -22,14 +22,14 @@ own, or if your UserId is in `ReplicatedStorage.Shared.Config.Admin` (group game
 
 | Command | Also | What it does |
 |---|---|---|
-| `video <level> [player]` | `setvideo` `vid` | Set your Video level (1-400) |
+| `video <level\|rebirth\|gates> [player]` | `setvideo` `vid` | Set the Video level (1-400). rebirth / gates = just enough to rebirth / open every gate here |
 | `addvideo <amount> [player]` | `av` | Add (or remove, with -) Video levels |
 | `views <amount> [player]` | `addviews` | Add views (1k, 2.5m, 1e9...) |
-| `evo <tier> [player]` | `evolve` `tier` | Jump to an Evolution tier (1-20) |
+| `evo <tier\|next\|prev> [player]` | `evolve` `tier` | Jump to an Evolution tier (1-20), or the next / previous one |
 | `clout <amount> [player]` | `setclout` | Set your clout |
 | `addclout <amount> [player]` | `ac` | Add clout |
 | `tickets <amount> [player]` | `tix` | Set your Niche Tickets |
-| `rebirths <count> [player]` | `setrebirths` | Set your rebirth count (keeps views) |
+| `rebirths <count> [player]` | `setrebirths` | Set the rebirth count, 0-77 (keeps views) |
 | `rebirth [player]` | `rb` | Rebirth right now (no Video needed) |
 | `upgrade <speed\|clout\|treadmill\|all> [level\|max] [player]` | `upg` | Set an upgrade level (default max) |
 | `max [player]` | `maxall` | Max everything: worlds, rivals, devices, upgrades, video, clout, passes |
@@ -69,7 +69,7 @@ own, or if your UserId is in `ReplicatedStorage.Shared.Config.Admin` (group game
 
 | Command | Also | What it does |
 |---|---|---|
-| `pet <name\|id> [count] [player]` | `givepet` | Give a pet |
+| `pet <name\|id> [count] [player]` | `givepet` | Give a pet (names without spaces: galaxydragon) |
 | `allpets [player]` |  | One of every pet (equips the best) |
 | `secretpet [player]` | `algopet` | Give The Algo Pet (Secret) |
 | `clearpets [player]` |  | Delete every pet |
@@ -119,10 +119,10 @@ own, or if your UserId is in `ReplicatedStorage.Shared.Config.Admin` (group game
 
 | Test | Commands |
 |---|---|
-| Gates + clout pads | `video 1`, then `addvideo 1` a few times and watch the gates open. Then `pad 3` |
-| Every evolution look | `evo 1` … `evo 20` (or NEXT EVO in the panel) |
+| Gates + clout pads | `video 1`, then `addvideo 1` a few times and watch the gates open. Then `pad 3`. `video gates` opens every gate in your world |
+| Every evolution look | `evo 1`, then `evo next` again and again (NEXT EVO in the panel) |
 | Treadmills | `rebirths 14`, `pass vip`, `pass megatreadmill`, `goto treadmills` |
-| Rebirth flow | `video 20`, then press REBIRTH at the station (or `rebirth`) |
+| Rebirth flow | `video rebirth`, then press REBIRTH at the station (or force it with `rebirth`) |
 | Devices | `clout 1qa`, then buy them in the shop, or `devices` |
 | Eggs + pets | `clout 1qa`, `goto eggs` (real hatch animation), or `hatch starteregg 10` / `secretpet` |
 | Niche roll | `tickets 99`, `goto niche`, `pity 49` to test the pity system |

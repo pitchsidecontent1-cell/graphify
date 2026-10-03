@@ -159,8 +159,11 @@ local function processPlayer(player: Player, now: number)
 	end
 
 	-- Gates (anti-exploit push back) ------------------------------------------------------
-	-- (admins flying / noclipping for testing are allowed through)
-	local bypass = player:GetAttribute("AdminFly") == true or player:GetAttribute("AdminNoclip") == true
+	-- (admins flying / noclipping for testing are allowed through, and so is
+	-- anyone in a View War: admins can start one before opening every gate)
+	local bypass = player:GetAttribute("AdminFly") == true
+		or player:GetAttribute("AdminNoclip") == true
+		or player:GetAttribute("InBattle") == true
 	local video = Stats.VideoLevel(data.Views)
 	for _, gate in (if bypass then {} else MapService.Gates[world] or {}) :: { MapService.Gate } do
 		if gate.Video > video then

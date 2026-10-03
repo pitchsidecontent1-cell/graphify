@@ -42,11 +42,14 @@ local RESERVED: { [string]: boolean } = {
 	whisper = true,
 	w = true,
 	mute = true,
+	m = true,
 	unmute = true,
+	um = true,
 	e = true,
 	emote = true,
 	version = true,
 	ver = true,
+	v = true,
 }
 
 function Admin.IsAdmin(): boolean
@@ -147,15 +150,16 @@ local function registerChatCommands()
 				table.insert(names, name)
 			end
 		end
-		if #names > 0 then
+		-- a TextChatCommand holds two aliases, so make one per pair of names
+		for i = 1, #names, 2 do
 			local ok = pcall(function()
 				local tc = Instance.new("TextChatCommand")
-				tc.Name = "Admin_" .. c.Name
-				tc.PrimaryAlias = "/" .. names[1]
-				if names[2] then
-					tc.SecondaryAlias = "/" .. names[2]
+				tc.Name = "Admin_" .. c.Name .. (if i > 1 then "_" .. i else "")
+				tc.PrimaryAlias = "/" .. names[i]
+				if names[i + 1] then
+					tc.SecondaryAlias = "/" .. names[i + 1]
 				end
-				tc.AutocompleteVisible = true
+				tc.AutocompleteVisible = i == 1
 				tc.Triggered:Connect(function(_source: TextSource, message: string)
 					task.spawn(Admin.Run, message, "chat")
 				end)
@@ -192,8 +196,17 @@ local function stopFly()
 	end
 end
 
-local function keyDown(...: Enum.KeyCode): boolean
+local function typing(): boolean
 	if UserInputService:GetFocusedTextBox() then
+		return true
+	end
+	-- the chat bar is a CoreGui box GetFocusedTextBox can't see
+	local bar = TextChatService:FindFirstChildOfClass("ChatInputBarConfiguration")
+	return bar ~= nil and bar.IsFocused
+end
+
+local function keyDown(...: Enum.KeyCode): boolean
+	if typing() then
 		return false
 	end
 	for _, key in { ... } do

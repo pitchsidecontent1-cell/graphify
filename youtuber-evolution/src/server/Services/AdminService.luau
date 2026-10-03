@@ -48,7 +48,8 @@ local AdminService = {}
 -- Who is an admin -------------------------------------------------------------------------------
 local adminCache: { [Player]: boolean } = {}
 
-local function computeAdmin(player: Player): boolean
+-- nil = couldn't tell right now (group lookup failed); not cached, retried later
+local function computeAdmin(player: Player): boolean?
 	if RunService:IsStudio() then
 		return true
 	end
@@ -62,11 +63,12 @@ local function computeAdmin(player: Player): boolean
 		local ok, groups = pcall(function()
 			return GroupService:GetGroupsAsync(player.UserId)
 		end)
-		if ok and typeof(groups) == "table" then
-			for _, g in groups do
-				if typeof(g) == "table" and g.Id == game.CreatorId then
-					return typeof(g.Rank) == "number" and g.Rank >= Admin.GroupMinRank
-				end
+		if not ok or typeof(groups) ~= "table" then
+			return nil
+		end
+		for _, g in groups do
+			if typeof(g) == "table" and g.Id == game.CreatorId then
+				return typeof(g.Rank) == "number" and g.Rank >= Admin.GroupMinRank
 			end
 		end
 	end
@@ -74,10 +76,13 @@ local function computeAdmin(player: Player): boolean
 end
 
 function AdminService.IsAdmin(player: Player): boolean
-	local cached = adminCache[player]
+	local cached: boolean? = adminCache[player]
 	if cached == nil then
-		cached = computeAdmin(player)
-		adminCache[player] = cached
+		local result = computeAdmin(player)
+		if result ~= nil then
+			adminCache[player] = result
+		end
+		cached = result
 	end
 	return cached == true
 end
@@ -128,6 +133,25 @@ local function worldOf(player: Player, data: Data): number
 	return if root then MapService.WorldAt(root.Position) else data.World
 end
 
+-- Index of the locked gate that `pos` is behind (the one that would push the
+-- player back), or nil. Mirrors MovementService's push-back check.
+local function lockedGateBehind(data: Data, pos: Vector3): number?
+	local world = MapService.WorldAt(pos)
+	local video = Stats.VideoLevel(data.Views)
+	for _, gate in (MapService.Gates[world] or {}) :: { MapService.Gate } do
+		if gate.Video > video then
+			local p = gate.Part.CFrame:PointToObjectSpace(pos)
+			if p.Z > 1.5 and math.abs(p.X) < 60 and p.Y > -10 and p.Y < 40 then
+				return gate.Index
+			end
+			return nil
+		end
+	end
+	return nil
+end
+
+-- Returns (ok, note). The note is "" or explains that noclip was switched on
+-- because the spot is behind a gate the player hasn't opened yet.
 local function teleport(player: Player, cf: CFrame): (boolean, string)
 	if RivalService.InBattle(player) then
 		return nope("is in a View War (use win / lose first)")
@@ -135,9 +159,17 @@ local function teleport(player: Player, cf: CFrame): (boolean, string)
 	if not CharacterService.Root(player) then
 		return nope("has no character right now")
 	end
+	local note = ""
+	local data = DataService.Get(player)
+	local bypass = player:GetAttribute("AdminFly") == true or player:GetAttribute("AdminNoclip") == true
+	local gate = if data and not bypass then lockedGateBehind(data, cf.Position) else nil
+	if gate then
+		player:SetAttribute("AdminNoclip", true)
+		note = " (noclip ON: you're past locked gate " .. gate .. ")"
+	end
 	MovementService.Grace(player, 1.5)
 	MapService.Teleport(player.Character, cf)
-	return done("")
+	return done(note)
 end
 
 local function stationPad(world: number, station: string): BasePart?
@@ -204,7 +236,16 @@ end
 -- me / all / others / part of a name
 local function resolvePlayers(caller: Player, token: string?): ({ Player }?, string?)
 	local q = if token then string.lower(token) else "me"
-	q = (string.gsub(q, "^@", ""))
+	-- "@name" = exactly this username (what the panel sends)
+	if string.sub(q, 1, 1) == "@" then
+		local name = string.sub(q, 2)
+		for _, p in Players:GetPlayers() do
+			if string.lower(p.Name) == name then
+				return { p }, nil
+			end
+		end
+		return nil, "No player named '" .. name .. "'"
+	end
 	if q == "" or q == "me" then
 		return { caller }, nil
 	end
@@ -223,15 +264,24 @@ local function resolvePlayers(caller: Player, token: string?): ({ Player }?, str
 		end
 		return list, nil
 	end
+	-- exact username, then exact display name, then the start of either
 	for _, p in Players:GetPlayers() do
-		if string.lower(p.Name) == q or string.lower(p.DisplayName) == q then
+		if string.lower(p.Name) == q then
 			return { p }, nil
 		end
 	end
 	local matches = {}
 	for _, p in Players:GetPlayers() do
-		if string.sub(string.lower(p.Name), 1, #q) == q or string.sub(string.lower(p.DisplayName), 1, #q) == q then
+		if string.lower(p.DisplayName) == q then
 			table.insert(matches, p)
+		end
+	end
+	if #matches == 0 then
+		for _, p in Players:GetPlayers() do
+			local name, display = string.lower(p.Name), string.lower(p.DisplayName)
+			if string.sub(name, 1, #q) == q or string.sub(display, 1, #q) == q then
+				table.insert(matches, p)
+			end
 		end
 	end
 	if #matches == 1 then
@@ -241,9 +291,9 @@ local function resolvePlayers(caller: Player, token: string?): ({ Player }?, str
 	end
 	local names = {}
 	for _, p in matches do
-		table.insert(names, p.Name)
+		table.insert(names, "@" .. p.Name)
 	end
-	return nil, "'" .. (token or "") .. "' matches " .. table.concat(names, ", ")
+	return nil, "'" .. (token or "") .. "' matches " .. table.concat(names, ", ") .. " - use @username"
 end
 
 -- Lookups ------------------------------------------------------------------------------------------
@@ -408,8 +458,27 @@ end
 
 -- Progress ---------------------------------------------------------------------------------------------
 IMPL.video = withData(function(target, data, args)
-	local level = setVideo(target, data, args[1])
-	return done("Video set to " .. level)
+	local word: string = args[1]
+	local current = Stats.VideoLevel(data.Views)
+	if word == "rebirth" then
+		local need = Stats.RebirthVideo(data.Rebirths)
+		if need > Economy.Video.Max then
+			return nope("can't reach the next rebirth (needs Video " .. need .. ") - use: rebirth")
+		end
+		local level = setVideo(target, data, math.max(current, need))
+		return done("Video " .. level .. " - ready to rebirth")
+	elseif word == "gates" then
+		local w = Worlds[worldOf(target, data)]
+		local level = setVideo(target, data, math.max(current, w.Gates[#w.Gates]))
+		return done("Video " .. level .. " - every gate in " .. w.Name .. " is open")
+	end
+	local n = AdminCommands.ParseNumber(word)
+	if not n then
+		return nope("Video must be a number, rebirth or gates")
+	end
+	local level = setVideo(target, data, math.floor(n + 0.5))
+	local capped = if n > Economy.Video.Max then " (max is " .. Economy.Video.Max .. ")" else ""
+	return done("Video set to " .. level .. capped)
 end)
 
 IMPL.addvideo = withData(function(target, data, args)
@@ -428,7 +497,16 @@ IMPL.views = withData(function(target, data, args)
 end)
 
 IMPL.evo = withData(function(target, data, args)
-	local tier = math.clamp(math.floor(args[1]), 1, #Evolutions)
+	local word: string = args[1]
+	local current = ProgressService.Tier(target)
+	local n = if word == "next" or word == "+1"
+		then current + 1
+		elseif word == "prev" or word == "previous" or word == "-1" then current - 1
+		else AdminCommands.ParseNumber(word)
+	if not n then
+		return nope("Evolution must be 1-" .. #Evolutions .. ", next or prev")
+	end
+	local tier = math.clamp(math.floor(n + 0.5), 1, #Evolutions)
 	local evo = Evolutions[tier]
 	setVideo(target, data, evo.Video)
 	return done("Evolution " .. tier .. ": " .. evo.Title .. " (Video " .. evo.Video .. ")")
@@ -451,7 +529,9 @@ IMPL.tickets = withData(function(target, data, args)
 end)
 
 IMPL.rebirths = withData(function(target, data, args)
-	data.Rebirths = math.clamp(math.floor(args[1]), 0, 100)
+	-- past this many rebirths the next one needs more than the max Video
+	local cap = math.floor((Economy.Video.Max - Economy.Rebirth.BaseVideo) / Economy.Rebirth.VideoPerRebirth) + 1
+	data.Rebirths = math.clamp(math.floor(args[1]), 0, cap)
 	DataService.Dirty(target, "Rebirths")
 	return done(
 		"Rebirths set to " .. data.Rebirths .. " (views " .. Format.Mult(Stats.RebirthMultiplier(data.Rebirths)) .. ")"
@@ -478,7 +558,7 @@ IMPL.upgrade = withData(function(target, data, args)
 	if #chosen == 0 then
 		return nope("Upgrades: " .. listKeys(Upgrades, "Id") .. ", all")
 	end
-	local n = if levelArg and levelArg ~= "max" then tonumber(levelArg) else nil
+	local n = if levelArg and levelArg ~= "max" then AdminCommands.ParseNumber(levelArg) else nil
 	if levelArg and levelArg ~= "max" and not n then
 		return nope("Level must be a number or max")
 	end
@@ -586,7 +666,7 @@ IMPL.gate = withData(function(target, data, args)
 		return ok, msg
 	end
 	local open = Stats.VideoLevel(data.Views) >= gate.Video
-	return done("At gate " .. n .. " (needs Video " .. gate.Video .. (if open then ", open)" else ", locked)"))
+	return done("At gate " .. n .. " (needs Video " .. gate.Video .. (if open then ", open)" else ", locked)") .. msg)
 end)
 
 IMPL.pad = withData(function(target, data, args)
@@ -599,7 +679,7 @@ IMPL.pad = withData(function(target, data, args)
 				return ok, msg
 			end
 			local open = Stats.OpenGates(data, world) >= n
-			return done("On clout pad " .. n .. (if open then "" else " (its gate is locked - try noclip)"))
+			return done("On clout pad " .. n .. (if open then "" else " - its gate is locked, so no clout") .. msg)
 		end
 	end
 	return nope("Pads are 1-" .. Stats.GatesPerWorld)
@@ -614,7 +694,7 @@ IMPL["goto"] = withData(function(target, data, args, caller)
 			return nope("Couldn't find the " .. place .. " in this world")
 		end
 		local ok, msg = teleport(target, cf)
-		return ok, if ok then "Teleported to " .. place else msg
+		return ok, if ok then "Teleported to " .. place .. msg else msg
 	end
 	-- not a place: teleport to a player
 	local list, err = resolvePlayers(caller, q)
@@ -632,7 +712,7 @@ IMPL["goto"] = withData(function(target, data, args, caller)
 		return nope(other.Name .. " has no character")
 	end
 	local ok, msg = teleport(target, root.CFrame * CFrame.new(0, 0, 4))
-	return ok, if ok then "Teleported to " .. other.DisplayName else msg
+	return ok, if ok then "Teleported to " .. other.DisplayName .. msg else msg
 end)
 
 IMPL.bring = function(caller, args)
@@ -1237,8 +1317,16 @@ end
 
 function AdminService.Start()
 	DataService.Loaded:Connect(function(player: Player)
-		if AdminService.IsAdmin(player) then
-			player:SetAttribute("Admin", true)
+		-- a failed group lookup isn't cached, so retry a few times
+		for _ = 1, 4 do
+			if AdminService.IsAdmin(player) then
+				player:SetAttribute("Admin", true)
+				return
+			end
+			if adminCache[player] ~= nil or not player.Parent then
+				return
+			end
+			task.wait(5)
 		end
 	end)
 	Players.PlayerAdded:Connect(watchChat)
