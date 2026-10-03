@@ -54,6 +54,7 @@ type Battle = {
 	you: number,
 	rival: number,
 	over: boolean,
+	forced: boolean?, -- admin win/lose, applied on the next tick
 }
 
 local battles: { [Player]: Battle } = {}
@@ -321,6 +322,9 @@ local function run(battle: Battle)
 		local rivalPush = BASE * (if surging then 1.8 else 1)
 		battle.clicks = 0
 		battle.p = math.clamp(battle.p + push - rivalPush, 0, 1)
+		if battle.forced ~= nil then
+			battle.p = if battle.forced then 1 else 0
+		end
 		battle.you += push * scale * 40
 		battle.rival += rivalPush * scale * 40
 		-- trend bubbles
@@ -349,7 +353,9 @@ local function run(battle: Battle)
 			Warn = warning,
 			Trend = trend,
 		})
-		if battle.p >= 1 then
+		if battle.forced ~= nil then
+			finish(battle, battle.forced)
+		elseif battle.p >= 1 then
 			finish(battle, true)
 		elseif t >= battle.duration then
 			finish(battle, battle.p > 0.5)
@@ -357,7 +363,8 @@ local function run(battle: Battle)
 	end
 end
 
-local function challenge(player: Player, world: number): Comms.Result
+-- `force` (admin testing) skips every requirement and walks you over first.
+local function challenge(player: Player, world: number, force: boolean?): Comms.Result
 	local data = DataService.Get(player)
 	local w = Worlds[world]
 	if not data or not w then
@@ -366,26 +373,40 @@ local function challenge(player: Player, world: number): Comms.Result
 	if battles[player] then
 		return Comms.Fail("Already in a View War!")
 	end
-	if os.clock() - (lastAttempt[player] or 0) < 3 then
+	if not force and os.clock() - (lastAttempt[player] or 0) < 3 then
 		return Comms.Fail("Catch your breath first!")
 	end
 	local root = CharacterService.Root(player)
-	if not root or MapService.WorldAt(root.Position) ~= world then
-		return Comms.Fail("Go to " .. w.Name .. " first!")
+	if not root then
+		return Comms.Fail("No character")
 	end
-	if
-		not MapService.NearStation(root.Position, "Rival", 26, function(pad)
-			return pad:GetAttribute("World") == world
-		end)
-	then
-		return Comms.Fail("Walk up to the rival to challenge them!")
-	end
-	if Stats.OpenGates(data, world) < Stats.GatesPerWorld then
-		return Comms.Fail("Open all " .. Stats.GatesPerWorld .. " gates first!")
-	end
-	local cooldown = (data.RivalCooldowns[tostring(world)] or 0) - os.time()
-	if cooldown > 0 then
-		return Comms.Fail("Rematch available in " .. Format.Duration(cooldown))
+	if force then
+		-- stand on the challenge pad so the battle spot is at ground level
+		for _, pad in MapService.StationPads do
+			if pad:GetAttribute("Station") == "Rival" and pad:GetAttribute("World") == world then
+				MovementService.Grace(player, 2)
+				MapService.Teleport(player.Character, CFrame.new(pad.Position + Vector3.new(0, 4, 0)))
+				break
+			end
+		end
+	else
+		if MapService.WorldAt(root.Position) ~= world then
+			return Comms.Fail("Go to " .. w.Name .. " first!")
+		end
+		if
+			not MapService.NearStation(root.Position, "Rival", 26, function(pad)
+				return pad:GetAttribute("World") == world
+			end)
+		then
+			return Comms.Fail("Walk up to the rival to challenge them!")
+		end
+		if Stats.OpenGates(data, world) < Stats.GatesPerWorld then
+			return Comms.Fail("Open all " .. Stats.GatesPerWorld .. " gates first!")
+		end
+		local cooldown = (data.RivalCooldowns[tostring(world)] or 0) - os.time()
+		if cooldown > 0 then
+			return Comms.Fail("Rematch available in " .. Format.Duration(cooldown))
+		end
 	end
 	lastAttempt[player] = os.clock()
 	local rivalPower = Stats.RivalPower(world)
@@ -447,6 +468,21 @@ end
 
 function RivalService.InBattle(player: Player): boolean
 	return battles[player] ~= nil
+end
+
+-- Admin: start a View War right now, ignoring gates, cooldowns and distance.
+function RivalService.ForceStart(player: Player, world: number): Comms.Result
+	return challenge(player, world, true)
+end
+
+-- Admin: end the current View War on its next tick (after the countdown).
+function RivalService.ForceResult(player: Player, win: boolean): boolean
+	local battle = battles[player]
+	if not battle or battle.over then
+		return false
+	end
+	battle.forced = win
+	return true
 end
 
 function RivalService.Init()

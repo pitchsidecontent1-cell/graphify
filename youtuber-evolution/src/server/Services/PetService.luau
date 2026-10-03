@@ -42,7 +42,7 @@ local function equippedSet(data: any): { [string]: boolean }
 end
 
 -- Equip the best pets you own (by bonus), up to your slot count.
-local function equipBest(player: Player)
+function PetService.EquipBest(player: Player)
 	local data = DataService.Get(player)
 	if not data then
 		return
@@ -118,7 +118,7 @@ local function hatch(player: Player, eggId: string, count: number): Comms.Result
 	for _, item in results do
 		local def = Pets.ById[item.Pet]
 		if worst and def.Bonus > worstBonus and not equippedSet(data)[item.Uid] then
-			equipBest(player)
+			PetService.EquipBest(player)
 			break
 		end
 	end
@@ -132,6 +132,29 @@ local function hatch(player: Player, eggId: string, count: number): Comms.Result
 		end
 	end
 	return Comms.Ok({ Pets = results })
+end
+
+-- Admin: one weighted roll from an egg (same odds as a real hatch).
+function PetService.Roll(egg: Pets.Egg): string
+	return rollPet(egg)
+end
+
+-- Admin: add `count` copies of a pet (capped by inventory space), then
+-- equip the best. Returns how many were added.
+function PetService.Give(player: Player, petId: string, count: number): number
+	local data = DataService.Get(player)
+	if not data or not Pets.ById[petId] then
+		return 0
+	end
+	local n = math.clamp(math.floor(count), 0, math.max(0, Economy.Pets.InventoryMax - #data.Pets))
+	for _ = 1, n do
+		table.insert(data.Pets, { Uid = newUid(), Pet = petId })
+	end
+	if n > 0 then
+		DataService.Dirty(player, "Pets")
+		PetService.EquipBest(player)
+	end
+	return n
 end
 
 function PetService.Init()
@@ -176,7 +199,7 @@ function PetService.Init()
 	end)
 
 	Comms.On("EquipBestPets", 2, function(player)
-		equipBest(player)
+		PetService.EquipBest(player)
 		return Comms.Ok()
 	end)
 

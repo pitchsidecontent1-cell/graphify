@@ -201,4 +201,25 @@ function RewardService.Claimed(player: Player): { [number]: boolean }
 	return giftsClaimed[player] or {}
 end
 
+-- Admin: pretend this session has lasted `elapsed` seconds and un-claim every
+-- gift (elapsed = 0 restarts the gift timer). The client's timer follows.
+function RewardService.SetGiftClock(player: Player, elapsed: number): boolean
+	if not sessionStart[player] then
+		return false
+	end
+	sessionStart[player] = os.clock() - elapsed
+	giftsClaimed[player] = {}
+	Comms.Effect(player, "Admin", { Kind = "Gifts", Elapsed = elapsed })
+	return true
+end
+
+-- Seconds until the last playtime gift unlocks.
+function RewardService.LastGiftSeconds(): number
+	local last = 0
+	for _, gift in Rewards.Gifts do
+		last = math.max(last, gift.Minutes * 60)
+	end
+	return last
+end
+
 return RewardService

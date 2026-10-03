@@ -50,7 +50,9 @@ function CharacterService.ApplySpeed(player: Player)
 	local data = DataService.Get(player)
 	local hum = humanoidOf(player)
 	if data and hum and not frozen[player] then
-		hum.WalkSpeed = Stats.WalkSpeed(data)
+		-- admins can override walk speed for testing (see AdminService "speed")
+		local override = player:GetAttribute("AdminSpeed")
+		hum.WalkSpeed = if typeof(override) == "number" then override else Stats.WalkSpeed(data)
 	end
 end
 

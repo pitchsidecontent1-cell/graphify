@@ -26,7 +26,10 @@ Map previews (rough renders of the baked map, without textures or text) are in [
 1. Download **`YoutuberEvolution.rbxl`** from this folder.
 2. Double-click it, or in Studio use **File → Open from File…**. The whole map is already there.
 3. Press **Play** (F5). Walk around: your views go up, gates open, and you can claim clout.
-4. In Studio you're an admin, so a 🛠️ button appears top-right. It can give you Videos, clout and tickets, unlock worlds, and test every Robux item.
+4. In Studio you're an admin, so you get **57 admin commands** to test everything fast (full list in [ADMIN.md](ADMIN.md)):
+   - the red 🛠️ **ADMIN** button (top right) has every command as a button, in tabs (Progress, World, Items, Pets, Rewards, Rivals, Robux, Server);
+   - press **;** for the command bar, e.g. `video 50`, `clout 1m`, `evo 12`, `fly`, `pet dragon 3`, `fight`, `win`, `pass vip`, `gifts`;
+   - or type them in chat: `/clout 1m`.
 
 ### Make saving work
 DataStores only work in a published game:
@@ -74,6 +77,8 @@ tools/       bake (map → place), simulate (economy), preview renders
 
 Server services: Data (session-locked saving), Map, Progress, Character (gear/size/nametag), Movement (steps, treadmills, gates, pads, portals), Shop, Rebirth, Reward, Monetization, Pet, Niche, Rival (VIEW WAR), Leaderboard, Admin, Boost.
 
+Admin commands are defined once in `src/shared/Util/AdminCommands.luau` (names, arguments, help), implemented in `Services/AdminService.luau`, and used by the panel, the command bar (`UI/AdminConsole.luau`) and chat (`Controllers/Admin.luau`). After adding a command, run `lune run tools/admin-docs.luau` to update ADMIN.md.
+
 ### Rebuilding the place file from source
 You only need this if you edit the `.luau` files outside Studio. It requires [Rokit](https://github.com/rojo-rbx/rokit) (`rokit install` installs Rojo, Lune, StyLua and luau-lsp).
 ```
@@ -86,7 +91,7 @@ For live editing, run `rojo serve` and connect the Rojo Studio plugin.
 ---
 
 ## 4. Before you publish
-- Add your UserId to `Config/Admin` (or rely on the owner check) so only you get the admin panel.
+- Admin commands work for you (the owner) automatically. Add friends' UserIds to `Config/Admin` if they should have them too. Nobody else can use them, because the server checks every command.
 - Upload a few icons and sounds (ASSETS_TODO.md) for extra polish. The emoji icons work fine in the meantime.
 - Set real gamepass/product IDs.
 - Optional: set `Products.GroupId` for the +10% group bonus.

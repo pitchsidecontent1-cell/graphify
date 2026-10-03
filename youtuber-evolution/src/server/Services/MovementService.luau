@@ -159,8 +159,10 @@ local function processPlayer(player: Player, now: number)
 	end
 
 	-- Gates (anti-exploit push back) ------------------------------------------------------
+	-- (admins flying / noclipping for testing are allowed through)
+	local bypass = player:GetAttribute("AdminFly") == true or player:GetAttribute("AdminNoclip") == true
 	local video = Stats.VideoLevel(data.Views)
-	for _, gate in (MapService.Gates[world] or {}) :: { MapService.Gate } do
+	for _, gate in (if bypass then {} else MapService.Gates[world] or {}) :: { MapService.Gate } do
 		if gate.Video > video then
 			local localPos = gate.Part.CFrame:PointToObjectSpace(pos)
 			if localPos.Z > 1.5 and math.abs(localPos.X) < 60 and localPos.Y > -10 and localPos.Y < 40 then
@@ -177,7 +179,7 @@ local function processPlayer(player: Player, now: number)
 
 	-- Rival monitor -------------------------------------------------------------------------
 	local monitor = MapService.RivalGates[world]
-	if monitor and not data.RivalsBeaten[tostring(world)] then
+	if monitor and not bypass and not data.RivalsBeaten[tostring(world)] then
 		local localPos = monitor.CFrame:PointToObjectSpace(pos)
 		if localPos.Z > 1.5 and math.abs(localPos.X) < 75 and math.abs(localPos.Y) < 40 then
 			MovementService.Grace(player, 0.6)

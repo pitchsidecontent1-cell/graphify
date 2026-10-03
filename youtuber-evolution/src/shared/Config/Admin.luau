@@ -1,7 +1,10 @@
 --!strict
--- People who can open the admin panel in live servers. The game owner and
--- anyone testing in Studio always can. Add your friends' UserIds here.
+-- Who gets admin commands in live servers. Everyone testing in Studio, and
+-- the game's owner, always do. Add your friends' UserIds here.
 
 return {
 	UserIds = {} :: { number },
+	-- If the game is owned by a group: members at or above this rank are admins
+	-- (255 = group owner only).
+	GroupMinRank = 255,
 }

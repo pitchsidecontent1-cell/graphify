@@ -80,7 +80,7 @@ for _, name in PANEL_MODULES do
 end
 
 -- Controllers -------------------------------------------------------------------------------
-local ORDER = { "Effects", "WorldFX", "PetFollow", "Battle", "Stations", "Lighting", "Guide", "Chat" }
+local ORDER = { "Effects", "WorldFX", "PetFollow", "Battle", "Stations", "Lighting", "Guide", "Chat", "Admin" }
 local controllers = {}
 for _, name in ORDER do
 	controllers[name] = (require :: any)(Controllers:WaitForChild(name))

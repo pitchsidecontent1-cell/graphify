@@ -221,6 +221,12 @@ end
 function Guide.Init() end
 
 function Guide.Start()
+	-- the admin "tutorial" command sets Tutorial back to false: start over
+	State.On("Tutorial", function(done)
+		if done == false then
+			step = 0
+		end
+	end)
 	local layer = UI.Layer(UI.HUD)
 	local h = Instance.new("Frame")
 	h.Name = "TutorialHint"

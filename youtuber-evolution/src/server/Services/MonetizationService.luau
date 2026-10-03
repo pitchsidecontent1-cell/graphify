@@ -44,12 +44,26 @@ function MonetizationService.GrantProduct(player: Player, product: Products.Prod
 	return true
 end
 
-function MonetizationService.GrantPass(player: Player, key: string)
+-- `quiet` skips the toast + confetti (admin "give every pass").
+function MonetizationService.GrantPass(player: Player, key: string, quiet: boolean?)
 	setPass(player, key)
 	local pass = Products.PassByKey[key]
-	if pass then
+	if pass and not quiet then
 		Comms.Notify(player, pass.Emoji .. " " .. pass.Name .. " unlocked!", "reward")
 		Comms.Effect(player, "Purchase", { Kind = "Pass", Id = key })
+	end
+end
+
+-- Admin testing: take a pass away for this session (ownership is re-checked
+-- from Roblox next time the player joins).
+function MonetizationService.RevokePass(player: Player, key: string)
+	local ctx = DataService.Context(player)
+	if ctx.Passes[key] then
+		ctx.Passes[key] = nil
+		DataService.ContextDirty(player)
+	end
+	if key == "VIP" then
+		player:SetAttribute("VIP", nil)
 	end
 end
 

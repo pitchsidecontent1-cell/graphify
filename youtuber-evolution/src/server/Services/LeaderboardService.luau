@@ -234,6 +234,16 @@ local function setupLiveBoards()
 	end
 end
 
+-- Admin: push everyone's stats + re-read the global boards right away.
+-- Returns false when DataStores aren't available (unpublished / no API access).
+function LeaderboardService.RefreshNow(): boolean
+	if not DataService.Persistent or next(stores) == nil then
+		return false
+	end
+	task.spawn(pcall, refreshGlobal)
+	return true
+end
+
 function LeaderboardService.Init()
 	for _, stat in { "TotalViews", "Rebirths" } do
 		local ok, store = pcall(function()
